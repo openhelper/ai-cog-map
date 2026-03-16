@@ -21,6 +21,7 @@ import json
 import logging
 import mmap
 import os
+import re
 import struct
 import threading
 import time
@@ -33,10 +34,50 @@ import torch.nn as nn
 logger = logging.getLogger("aicogmap.hook")
 
 DEFAULT_SHM_PATH = "/dev/shm/aicogmap-activations"
+DEFAULT_META_PATH = "/dev/shm/aicogmap-metadata.json"
 HEADER_SIZE = 64  # bytes: magic(4) + version(4) + num_layers(4) + timestamp_ns(8) + flags(4) + reserved(40)
 MAGIC = b"ACGM"
-VERSION = 1
+VERSION = 2
 MAX_LAYERS = 1024
+
+# Module name → (component_type, component_category) mapping.
+# Ordered from most specific to least — first match wins.
+_COMPONENT_RULES: list[tuple[str, str, str]] = [
+    (r"\.input_layernorm$",          "layernorm_input",  "norm"),
+    (r"\.post_attention_layernorm$",  "layernorm_post",   "norm"),
+    (r"\.linear_attn\.conv1d$",       "attention_conv",   "attention"),
+    (r"\.linear_attn\.in_proj_qkv$",  "attention_qkv",    "attention"),
+    (r"\.linear_attn\.in_proj_z$",    "attention_gate",   "attention"),
+    (r"\.linear_attn\.in_proj_a$",    "attention_proj_a", "projection"),
+    (r"\.linear_attn\.in_proj_b$",    "attention_proj_b", "projection"),
+    (r"\.self_attn\.q_proj$",         "attention_qkv",    "attention"),
+    (r"\.self_attn\.k_proj$",         "attention_qkv",    "attention"),
+    (r"\.self_attn\.v_proj$",         "attention_qkv",    "attention"),
+    (r"\.self_attn\.o_proj$",         "attention_proj_a", "projection"),
+    (r"\.self_attn$",                 "attention",        "attention"),
+    (r"\.linear_attn$",              "attention",        "attention"),
+    (r"\.mlp\.gate_up_proj$",         "mlp_gate_up",      "mlp"),
+    (r"\.mlp\.gate_proj$",            "mlp_gate_up",      "mlp"),
+    (r"\.mlp\.up_proj$",              "mlp_gate_up",      "mlp"),
+    (r"\.mlp\.down_proj$",            "mlp_down",         "mlp"),
+    (r"\.mlp$",                       "mlp",              "mlp"),
+]
+_COMPILED_RULES = [(re.compile(pat), ctype, ccat) for pat, ctype, ccat in _COMPONENT_RULES]
+
+
+def _classify_module(name: str) -> tuple[int | None, str, str]:
+    """Extract (layer_index, component_type, component_category) from a module name."""
+    layer_match = re.search(r"model\.layers\.(\d+)", name)
+    layer_idx = int(layer_match.group(1)) if layer_match else None
+
+    for pattern, ctype, ccat in _COMPILED_RULES:
+        if pattern.search(name):
+            return layer_idx, ctype, ccat
+
+    if layer_match and name.rstrip().endswith(f"model.layers.{layer_idx}"):
+        return layer_idx, "layer_output", "layer"
+
+    return layer_idx, "unknown", "other"
 
 
 class ActivationWriter:
@@ -45,7 +86,7 @@ class ActivationWriter:
     def __init__(self, shm_path: str, num_layers: int):
         self.shm_path = shm_path
         self.num_layers = min(num_layers, MAX_LAYERS)
-        self.data_size = HEADER_SIZE + self.num_layers * 4  # float32 per layer
+        self.data_size = HEADER_SIZE + self.num_layers * 4
         self._lock = threading.Lock()
         self._layer_norms = [0.0] * self.num_layers
         self._dirty = False
@@ -92,7 +133,6 @@ class ActivationWriter:
             self._mm.seek(HEADER_SIZE)
             for val in self._layer_norms:
                 self._mm.write(struct.pack("<f", val))
-            # Update timestamp
             self._mm.seek(12)
             self._mm.write(struct.pack("<Q", time.time_ns()))
             self._dirty = False
@@ -124,30 +164,71 @@ class ActivationFlusher(threading.Thread):
 
 _writer: ActivationWriter | None = None
 _flusher: ActivationFlusher | None = None
-_layer_index_map: dict[str, int] = {}
+_layer_index_map: dict[int, int] = {}
 _layer_counter: int = 0
+_module_metadata: dict[int, dict[str, Any]] = {}
+_meta_path: str = DEFAULT_META_PATH
+_model_name_map: dict[int, str] | None = None
 
 
-def _make_hook(layer_idx: int) -> Callable:
-    """Create a forward hook closure for a specific layer index."""
+def _build_name_map(module: nn.Module) -> dict[int, str]:
+    """Walk the full model tree once to map id(module) → qualified name."""
+    root = module
+    while hasattr(root, "_modules") and hasattr(root, "_get_name"):
+        parent = getattr(root, "_parent", None)
+        if parent is None:
+            break
+        root = parent
 
-    def hook_fn(module: nn.Module, input: Any, output: Any):
-        if _writer is None:
-            return
-        try:
-            if isinstance(output, tuple):
-                tensor = output[0]
-            elif isinstance(output, torch.Tensor):
-                tensor = output
-            else:
-                return
+    result: dict[int, str] = {}
+    try:
+        for name, mod in root.named_modules():
+            result[id(mod)] = name
+    except Exception:
+        pass
+    return result
 
-            norm = tensor.detach().float().norm().item()
-            _writer.record(layer_idx, norm)
-        except Exception:
-            pass
 
-    return hook_fn
+def _resolve_module_name(module: nn.Module) -> str:
+    """Resolve the fully qualified name for a module via the cached name map."""
+    global _model_name_map
+    if _model_name_map is None:
+        _model_name_map = _build_name_map(module)
+    name = _model_name_map.get(id(module))
+    if name:
+        return name
+    # Fallback: rebuild once in case module tree changed
+    _model_name_map = _build_name_map(module)
+    return _model_name_map.get(id(module), f"unknown_{id(module)}")
+
+
+def _write_metadata_sidecar():
+    """Write the metadata sidecar JSON file atomically."""
+    meta_entries = []
+    for mod_id, idx in sorted(_layer_index_map.items(), key=lambda x: x[1]):
+        info = _module_metadata.get(mod_id, {})
+        meta_entries.append({
+            "index": idx,
+            "layer": info.get("layer"),
+            "type": info.get("type", "unknown"),
+            "category": info.get("category", "other"),
+            "full_name": info.get("full_name", ""),
+        })
+
+    sidecar = {
+        "version": VERSION,
+        "num_hooks": len(meta_entries),
+        "written_at": time.time(),
+        "hooks": meta_entries,
+    }
+
+    tmp_path = _meta_path + ".tmp"
+    try:
+        with open(tmp_path, "w") as f:
+            json.dump(sidecar, f, separators=(",", ":"))
+        os.replace(tmp_path, _meta_path)
+    except Exception:
+        logger.debug("AI Cog Map: failed to write metadata sidecar", exc_info=True)
 
 
 def create_activation_hook(config: dict[str, Any] | None = None) -> Callable:
@@ -155,32 +236,31 @@ def create_activation_hook(config: dict[str, Any] | None = None) -> Callable:
     SGLang hook factory. Called once at startup by SGLang's hook manager.
 
     Returns a forward hook function that SGLang attaches to each matched module.
-    Each call to the returned hook identifies its layer by module identity and
-    assigns a sequential index.
+    Each call to the returned hook identifies its layer by module identity,
+    assigns a sequential index, and classifies the module's component type.
 
     Config options:
         shm_path: str — shared memory file path (default: /dev/shm/aicogmap-activations)
+        meta_path: str — metadata sidecar JSON path (default: /dev/shm/aicogmap-metadata.json)
         flush_interval: float — seconds between shared memory flushes (default: 0.1)
-        max_layers: int — maximum number of layers to track (default: 256)
+        max_layers: int — maximum number of layers to track (default: 1024)
     """
-    global _writer, _flusher, _layer_counter
+    global _writer, _flusher, _layer_counter, _meta_path, _model_name_map
 
     config = config or {}
     shm_path = config.get("shm_path", DEFAULT_SHM_PATH)
+    _meta_path = config.get("meta_path", DEFAULT_META_PATH)
     flush_interval = config.get("flush_interval", 0.1)
     max_layers = config.get("max_layers", MAX_LAYERS)
 
-    logger.info("AI Cog Map: hook factory called, shm_path=%s", shm_path)
+    logger.info("AI Cog Map: hook factory called, shm_path=%s, meta_path=%s", shm_path, _meta_path)
 
-    # We don't know total layer count yet — SGLang calls this factory once,
-    # then attaches the returned hook to each matched module. We'll initialize
-    # the writer lazily on first hook call once we know the count, or
-    # pre-allocate with max_layers.
     _writer = ActivationWriter(shm_path, max_layers)
     _flusher = ActivationFlusher(_writer, flush_interval)
     _flusher.start()
 
     _layer_counter = 0
+    _model_name_map = None
 
     def hook_fn(module: nn.Module, input: Any, output: Any):
         global _layer_counter
@@ -189,14 +269,30 @@ def create_activation_hook(config: dict[str, Any] | None = None) -> Callable:
 
         mod_id = id(module)
         if mod_id not in _layer_index_map:
-            _layer_index_map[mod_id] = _layer_counter
+            idx = _layer_counter
+            _layer_index_map[mod_id] = idx
             _layer_counter += 1
-            # Update actual layer count in shared memory header
+
             if _writer._mm:
                 _writer._mm.seek(8)
                 _writer._mm.write(struct.pack("<I", _layer_counter))
 
-        idx = _layer_index_map[mod_id]
+            full_name = _resolve_module_name(module)
+            layer_idx, comp_type, comp_cat = _classify_module(full_name)
+            _module_metadata[mod_id] = {
+                "layer": layer_idx,
+                "type": comp_type,
+                "category": comp_cat,
+                "full_name": full_name,
+            }
+            _write_metadata_sidecar()
+            logger.debug(
+                "AI Cog Map: hook %d → %s (layer=%s, type=%s, cat=%s)",
+                idx, full_name, layer_idx, comp_type, comp_cat,
+            )
+        else:
+            idx = _layer_index_map[mod_id]
+
         try:
             if isinstance(output, tuple):
                 tensor = output[0]
@@ -211,52 +307,3 @@ def create_activation_hook(config: dict[str, Any] | None = None) -> Callable:
             pass
 
     return hook_fn
-
-
-def read_activations(shm_path: str = DEFAULT_SHM_PATH) -> dict[str, Any] | None:
-    """
-    Read current activation data from shared memory.
-    Intended for use by the visualization server.
-
-    Returns dict with keys: num_layers, timestamp_ns, norms (list of floats),
-    or None if unavailable.
-    """
-    try:
-        path = Path(shm_path)
-        if not path.exists():
-            return None
-
-        with open(shm_path, "rb") as f:
-            data = f.read()
-
-        if len(data) < HEADER_SIZE:
-            return None
-
-        magic = data[:4]
-        if magic != MAGIC:
-            return None
-
-        version = struct.unpack("<I", data[4:8])[0]
-        num_layers = struct.unpack("<I", data[8:12])[0]
-        timestamp_ns = struct.unpack("<Q", data[12:20])[0]
-
-        if num_layers == 0 or len(data) < HEADER_SIZE + num_layers * 4:
-            return None
-
-        norms = []
-        for i in range(num_layers):
-            offset = HEADER_SIZE + i * 4
-            val = struct.unpack("<f", data[offset:offset + 4])[0]
-            norms.append(val)
-
-        age_s = (time.time_ns() - timestamp_ns) / 1e9
-
-        return {
-            "version": version,
-            "num_layers": num_layers,
-            "timestamp_ns": timestamp_ns,
-            "age_s": round(age_s, 3),
-            "norms": norms,
-        }
-    except Exception:
-        return None

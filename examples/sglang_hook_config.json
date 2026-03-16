@@ -5,8 +5,9 @@
     "hook_factory": "aicogmap.hook:create_activation_hook",
     "config": {
       "shm_path": "/dev/shm/aicogmap-activations",
+      "meta_path": "/dev/shm/aicogmap-metadata.json",
       "flush_interval": 0.1,
-      "max_layers": 256
+      "max_layers": 1024
     }
   }
 ]

@@ -19,6 +19,8 @@
   --accent:   #a78bfa;
   --green:    #34d399;
   --pink:     #f472b6;
+  --orange:   #f59e0b;
+  --red:      #f87171;
   --font:     'Space Grotesk', sans-serif;
   --mono:     'JetBrains Mono', monospace;
 }
@@ -69,12 +71,43 @@ header .subtitle {
 .conn-dot.ok { background: var(--green); box-shadow: 0 0 8px var(--green); }
 .conn-dot.off { background: var(--muted); }
 
+/* --- Cognitive State Interpreter --- */
+.cog-state {
+  text-align: center;
+  margin-bottom: 20px;
+  min-height: 52px;
+}
+.cog-label {
+  font-size: 32px;
+  font-weight: 700;
+  font-family: var(--mono);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  transition: opacity 0.5s ease, color 0.5s ease;
+  opacity: 0.9;
+}
+.cog-label.s-Attending   { color: var(--cyan); text-shadow: 0 0 20px rgba(34,211,238,0.4); }
+.cog-label.s-Reasoning   { color: var(--purple); text-shadow: 0 0 20px rgba(139,92,246,0.4); }
+.cog-label.s-Structuring  { color: var(--accent); text-shadow: 0 0 20px rgba(167,139,250,0.4); }
+.cog-label.s-Recalling   { color: var(--orange); text-shadow: 0 0 20px rgba(245,158,11,0.4); }
+.cog-label.s-Searching   { color: var(--dim); text-shadow: 0 0 10px rgba(100,116,139,0.3); }
+.cog-label.s-Generating  { color: var(--green); text-shadow: 0 0 20px rgba(52,211,153,0.4); }
+.cog-label.s-Processing  { color: var(--text); text-shadow: 0 0 10px rgba(226,232,240,0.2); }
+.cog-label.s-Idle        { color: var(--muted); }
+.cog-sub {
+  font-size: 10px;
+  font-family: var(--mono);
+  color: var(--muted);
+  margin-top: 4px;
+}
+
 /* Stats bar */
 .stats-bar {
   display: flex;
   gap: 24px;
   justify-content: center;
   margin-bottom: 24px;
+  flex-wrap: wrap;
 }
 .stat-item { text-align: center; }
 .stat-val {
@@ -87,6 +120,7 @@ header .subtitle {
 .stat-val.v-active { color: var(--cyan); }
 .stat-val.v-mean   { color: var(--green); }
 .stat-val.v-age    { color: var(--dim); }
+.stat-val.v-hooks  { color: var(--pink); }
 .stat-label {
   font-size: 9px;
   font-weight: 600;
@@ -94,6 +128,86 @@ header .subtitle {
   letter-spacing: 1px;
   color: var(--muted);
   margin-top: 4px;
+}
+
+/* --- Cognitive Depth Slider --- */
+.depth-control {
+  max-width: 900px;
+  width: 100%;
+  margin-bottom: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.depth-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.depth-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: rgba(139,92,246,0.15);
+  border-radius: 3px;
+  outline: none;
+}
+.depth-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(167,139,250,0.5);
+  cursor: pointer;
+}
+.depth-slider::-moz-range-thumb {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(167,139,250,0.5);
+  cursor: pointer;
+  border: none;
+}
+.depth-value {
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--accent);
+  min-width: 120px;
+  text-align: right;
+}
+.depth-flash {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: var(--cyan);
+  text-shadow: 0 0 30px rgba(34,211,238,0.6);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 100;
+}
+.depth-flash.show {
+  opacity: 1;
+  animation: flash-fade 1.2s ease forwards;
+}
+@keyframes flash-fade {
+  0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  40% { opacity: 0.9; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.1); }
 }
 
 /* Heatmap */
@@ -104,6 +218,13 @@ header .subtitle {
   padding: 24px;
   max-width: 900px;
   width: 100%;
+  position: relative;
+}
+.heatmap-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
 }
 .heatmap-title {
   font-size: 11px;
@@ -111,8 +232,24 @@ header .subtitle {
   text-transform: uppercase;
   letter-spacing: 1px;
   color: var(--muted);
-  margin-bottom: 14px;
-  text-align: center;
+}
+.info-btn {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: 1px solid rgba(139,92,246,0.3);
+  background: rgba(139,92,246,0.08);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.info-btn:hover {
+  background: rgba(139,92,246,0.2);
+  border-color: rgba(139,92,246,0.5);
 }
 .heatmap-grid {
   display: grid;
@@ -124,9 +261,24 @@ header .subtitle {
   border-radius: 4px;
   background: rgba(139,92,246,0.03);
   transition: background 0.4s ease, box-shadow 0.4s ease;
+  position: relative;
+}
+.hm-cell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.4s;
 }
 
-/* Glow levels — purple to cyan gradient based on activation intensity */
+/* Component tinting via data attribute */
+.hm-cell[data-cat="attention"]::after  { background: rgba(34,211,238,0.08); opacity: 1; }
+.hm-cell[data-cat="mlp"]::after       { background: rgba(244,114,182,0.08); opacity: 1; }
+.hm-cell[data-cat="projection"]::after { background: rgba(245,158,11,0.06); opacity: 1; }
+.hm-cell[data-cat="norm"]::after      { background: rgba(52,211,153,0.06); opacity: 1; }
+
+/* Glow levels */
 .hm-cell.g1  { background: rgba(139,92,246,0.08); }
 .hm-cell.g2  { background: rgba(139,92,246,0.16); }
 .hm-cell.g3  { background: rgba(139,92,246,0.28); box-shadow: 0 0 3px rgba(139,92,246,0.15); }
@@ -148,10 +300,8 @@ header .subtitle {
   padding: 0 2px;
 }
 
-/* Delta bar (change intensity) */
-.delta-section {
-  margin-top: 20px;
-}
+/* Delta bar */
+.delta-section { margin-top: 20px; }
 .delta-title {
   font-size: 10px;
   font-weight: 600;
@@ -179,13 +329,140 @@ header .subtitle {
 .delta-cell.d4 { background: rgba(244,114,182,0.5); }
 .delta-cell.d5 { background: rgba(244,114,182,0.7); box-shadow: inset 0 0 6px rgba(244,114,182,0.3); }
 
-/* No data state */
+/* Energy bars */
+.energy-section {
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.energy-item {
+  text-align: center;
+  padding: 8px;
+  background: rgba(255,255,255,0.02);
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.03);
+}
+.energy-bar-track {
+  height: 4px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 2px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+.energy-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+.energy-label {
+  font-size: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--muted);
+}
+.energy-val {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--mono);
+  line-height: 1.2;
+}
+
 .no-data {
   text-align: center;
   color: var(--muted);
   font-style: italic;
   padding: 40px 0;
   font-size: 14px;
+}
+
+/* --- Info Modal --- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6,6,14,0.85);
+  backdrop-filter: blur(8px);
+  z-index: 200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px;
+  max-width: 680px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.modal h2 {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: var(--accent);
+}
+.modal table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.modal th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--muted);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.modal td {
+  padding: 7px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  color: var(--dim);
+}
+.modal td:first-child {
+  font-family: var(--mono);
+  font-weight: 500;
+  color: var(--text);
+  font-size: 11px;
+}
+.modal-close {
+  float: right;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--dim);
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.modal-close:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Legend row */
+.legend-row {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  font-family: var(--mono);
+  color: var(--muted);
+}
+.legend-swatch {
+  width: 10px; height: 10px;
+  border-radius: 3px;
 }
 
 footer {
@@ -209,33 +486,134 @@ footer a { color: var(--accent); text-decoration: none; }
   </div>
 </header>
 
+<div class="cog-state" id="cog-state">
+  <div class="cog-label s-Idle" id="cog-label">Idle</div>
+  <div class="cog-sub" id="cog-sub">waiting for inference</div>
+</div>
+
 <div class="stats-bar" id="stats-bar"></div>
 
+<div class="depth-control">
+  <span class="depth-label">Cognitive Depth</span>
+  <input type="range" class="depth-slider" id="depth-slider" min="1" max="5" value="2" step="1" />
+  <span class="depth-value" id="depth-value">Attention &amp; MLP</span>
+</div>
+
 <div class="heatmap-container">
-  <div class="heatmap-title">Layer Activation Map</div>
+  <div class="heatmap-header">
+    <span class="heatmap-title">Layer Activation Map</span>
+    <button class="info-btn" id="info-btn" title="Component reference">?</button>
+  </div>
   <div class="heatmap-grid" id="heatmap-grid"></div>
   <div class="heatmap-axis" id="heatmap-axis"></div>
+  <div class="legend-row" id="legend-row"></div>
   <div class="delta-section">
     <div class="delta-title">Activation Change (delta)</div>
     <div class="delta-bar" id="delta-bar"></div>
   </div>
+  <div class="energy-section" id="energy-section"></div>
+</div>
+
+<div class="depth-flash" id="depth-flash"></div>
+
+<!-- Info Modal -->
+<div class="modal-overlay" id="info-modal">
+  <div class="modal">
+    <button class="modal-close" id="modal-close">Close</button>
+    <h2>Component Reference</h2>
+    <table>
+      <thead>
+        <tr><th>Component</th><th>What it does</th><th>High activation means</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>layer_output</td><td>Full layer contribution to residual stream</td><td>Overall layer importance</td></tr>
+        <tr><td>attention</td><td>Attention block aggregated output</td><td>Token-to-token relationships active</td></tr>
+        <tr><td>attention_conv</td><td>Mamba-style convolution in hybrid attention</td><td>Local sequential pattern matching</td></tr>
+        <tr><td>attention_qkv</td><td>Query/Key/Value projections</td><td>Complex attention query formation</td></tr>
+        <tr><td>attention_gate</td><td>Attention gating mechanism</td><td>Selective attention filtering</td></tr>
+        <tr><td>attention_proj</td><td>Attention output projections</td><td>Compressed attention output</td></tr>
+        <tr><td>mlp</td><td>Feed-forward network block</td><td>Knowledge recall and reasoning</td></tr>
+        <tr><td>mlp_gate_up</td><td>MLP gated projection (SwiGLU)</td><td>Which knowledge neurons fired</td></tr>
+        <tr><td>mlp_down</td><td>MLP output down-projection</td><td>Compressed reasoning output</td></tr>
+        <tr><td>layernorm_input</td><td>Pre-attention normalization</td><td>Signal scale into attention</td></tr>
+        <tr><td>layernorm_post</td><td>Post-attention normalization</td><td>Signal scale into MLP</td></tr>
+      </tbody>
+    </table>
+    <h2 style="margin-top:20px">Cognitive States</h2>
+    <table>
+      <thead>
+        <tr><th>State</th><th>Pattern</th><th>Typical tasks</th></tr>
+      </thead>
+      <tbody>
+        <tr><td style="color:var(--cyan)">Attending</td><td>Attention energy &gt; 65% of total</td><td>Reading context, following references</td></tr>
+        <tr><td style="color:var(--purple)">Reasoning</td><td>MLP dominant, deep layers active</td><td>Math, logic, code generation</td></tr>
+        <tr><td style="color:var(--accent)">Structuring</td><td>MLP dominant, early layers active</td><td>Parsing syntax, organizing output</td></tr>
+        <tr><td style="color:var(--orange)">Recalling</td><td>MLP gate projections highest</td><td>Factual recall, knowledge lookup</td></tr>
+        <tr><td style="color:var(--dim)">Searching</td><td>Low variance across layers</td><td>Uncertain, exploring possibilities</td></tr>
+        <tr><td style="color:var(--green)">Generating</td><td>Deep layers &gt; 50% of total energy</td><td>Token generation, text completion</td></tr>
+        <tr><td style="color:var(--text)">Processing</td><td>No dominant pattern</td><td>Mixed or transitional processing</td></tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <footer>
-  <a href="https://github.com/openhelper/ai-cog-map">AI Cog Map</a> v0.1.0 — Real-time transformer layer activation visualization
+  <a href="https://github.com/openhelper/ai-cog-map">AI Cog Map</a> v0.2.0 — Real-time transformer layer activation visualization
 </footer>
 
 <script>
 const $ = sel => document.querySelector(sel);
-let prevNorms = null;
 let cellDecay = {};
+let currentDepth = 2;
+let prevCogLabel = 'Idle';
 
-function computeGridCols(numLayers) {
-  if (numLayers <= 16) return numLayers;
-  if (numLayers <= 32) return 16;
-  if (numLayers <= 64) return 16;
-  if (numLayers <= 128) return 16;
-  return 16;
+const DEPTH_LABELS = {
+  1: 'Layer Outputs',
+  2: 'Attention & MLP',
+  3: 'Projections',
+  4: 'Layer Norms',
+  5: 'Full Detail',
+};
+
+const CAT_COLORS = {
+  layer:      { swatch: 'rgba(167,139,250,0.6)', label: 'Layer Output' },
+  attention:  { swatch: 'rgba(34,211,238,0.6)',  label: 'Attention' },
+  mlp:        { swatch: 'rgba(244,114,182,0.6)', label: 'MLP' },
+  projection: { swatch: 'rgba(245,158,11,0.6)',  label: 'Projection' },
+  norm:       { swatch: 'rgba(52,211,153,0.6)',  label: 'Norm' },
+  other:      { swatch: 'rgba(100,116,139,0.6)', label: 'Other' },
+};
+
+// Depth slider
+const slider = $('#depth-slider');
+const depthVal = $('#depth-value');
+const flashEl = $('#depth-flash');
+
+slider.addEventListener('input', function() {
+  currentDepth = parseInt(this.value);
+  depthVal.textContent = DEPTH_LABELS[currentDepth] || '';
+  cellDecay = {};
+
+  flashEl.textContent = '+ ' + DEPTH_LABELS[currentDepth];
+  flashEl.classList.remove('show');
+  void flashEl.offsetWidth;
+  flashEl.classList.add('show');
+});
+
+// Info modal
+$('#info-btn').addEventListener('click', () => $('#info-modal').classList.add('open'));
+$('#modal-close').addEventListener('click', () => $('#info-modal').classList.remove('open'));
+$('#info-modal').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('open');
+});
+
+function computeGridCols(n) {
+  if (n <= 16) return n;
+  if (n <= 64) return 16;
+  if (n <= 128) return 16;
+  if (n <= 256) return 16;
+  if (n <= 512) return 24;
+  return 32;
 }
 
 function normToLevel(n) {
@@ -261,93 +639,161 @@ function deltaToLevel(d) {
   return 5;
 }
 
-function renderGrid(norms, deltas) {
-  const grid = $('#heatmap-grid');
-  const deltaBar = $('#delta-bar');
-  const axis = $('#heatmap-axis');
-  const n = norms.length;
+function renderGrid(norms, deltas, hooks) {
+  var grid = $('#heatmap-grid');
+  var deltaBar = $('#delta-bar');
+  var axis = $('#heatmap-axis');
+  var legend = $('#legend-row');
+  var n = norms.length;
 
   if (n === 0) {
     grid.innerHTML = '<div class="no-data">Waiting for activation data...</div>';
     deltaBar.innerHTML = '';
     axis.innerHTML = '';
+    legend.innerHTML = '';
     return;
   }
 
-  const cols = computeGridCols(n);
-  grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  var cols = computeGridCols(n);
+  grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
 
-  // Build or update cells
-  if (grid.children.length !== n || grid.querySelector('.no-data')) {
-    let html = '';
-    for (let i = 0; i < n; i++) {
-      html += `<div class="hm-cell" data-idx="${i}" title="Layer ${i}"></div>`;
+  var needRebuild = grid.children.length !== n || grid.querySelector('.no-data');
+  if (needRebuild) {
+    var html = '';
+    for (var i = 0; i < n; i++) {
+      var cat = (hooks && hooks[i]) ? hooks[i].category : '';
+      var compType = (hooks && hooks[i]) ? hooks[i].type : '';
+      var layerIdx = (hooks && hooks[i] && hooks[i].layer != null) ? hooks[i].layer : i;
+      html += '<div class="hm-cell" data-idx="' + i + '" data-cat="' + cat + '" title="' + compType + ' (layer ' + layerIdx + ')"></div>';
     }
     grid.innerHTML = html;
   }
 
-  const cells = grid.querySelectorAll('.hm-cell');
-  for (let i = 0; i < n; i++) {
-    // Blend current norm with decay for smoother transitions
-    const key = 'L' + i;
-    const prev = cellDecay[key] || 0;
-    const target = norms[i];
-    const blended = prev * 0.3 + target * 0.7;
+  var cells = grid.querySelectorAll('.hm-cell');
+  for (var i = 0; i < n; i++) {
+    var key = 'L' + i;
+    var prev = cellDecay[key] || 0;
+    var target = norms[i];
+    var blended = prev * 0.3 + target * 0.7;
     cellDecay[key] = blended;
-
-    const level = normToLevel(blended);
+    var level = normToLevel(blended);
+    var cat = cells[i].getAttribute('data-cat') || '';
     cells[i].className = 'hm-cell' + (level > 0 ? ' g' + level : '');
+    if (cat) cells[i].setAttribute('data-cat', cat);
   }
 
   // Delta bar
   if (deltas.length === n) {
     if (deltaBar.children.length !== n) {
-      let dHtml = '';
-      for (let i = 0; i < n; i++) {
-        dHtml += `<div class="delta-cell" title="Layer ${i} delta"></div>`;
+      var dHtml = '';
+      for (var i = 0; i < n; i++) {
+        dHtml += '<div class="delta-cell"></div>';
       }
       deltaBar.innerHTML = dHtml;
     }
-    const dCells = deltaBar.querySelectorAll('.delta-cell');
-    for (let i = 0; i < n; i++) {
-      const dl = deltaToLevel(deltas[i]);
+    var dCells = deltaBar.querySelectorAll('.delta-cell');
+    for (var i = 0; i < n; i++) {
+      var dl = deltaToLevel(deltas[i]);
       dCells[i].className = 'delta-cell' + (dl > 0 ? ' d' + dl : '');
     }
   }
 
   // Axis
-  if (axis.children.length === 0) {
-    axis.innerHTML = `<span>Layer 0</span><span>Layer ${Math.floor(n/4)}</span><span>Layer ${Math.floor(n/2)}</span><span>Layer ${Math.floor(3*n/4)}</span><span>Layer ${n-1}</span>`;
+  var maxLayer = 0;
+  if (hooks) {
+    hooks.forEach(function(h) { if (h.layer != null && h.layer > maxLayer) maxLayer = h.layer; });
   }
+  if (maxLayer === 0) maxLayer = n - 1;
+  axis.innerHTML = '<span>Layer 0</span><span>Layer ' + Math.floor(maxLayer/4) + '</span><span>Layer ' + Math.floor(maxLayer/2) + '</span><span>Layer ' + Math.floor(3*maxLayer/4) + '</span><span>Layer ' + maxLayer + '</span>';
+
+  // Legend
+  var seenCats = {};
+  if (hooks) {
+    hooks.forEach(function(h) { if (h.category) seenCats[h.category] = true; });
+  }
+  var legendHtml = '';
+  Object.keys(seenCats).forEach(function(cat) {
+    var info = CAT_COLORS[cat] || CAT_COLORS.other;
+    legendHtml += '<div class="legend-item"><div class="legend-swatch" style="background:' + info.swatch + '"></div>' + info.label + '</div>';
+  });
+  legend.innerHTML = legendHtml;
 }
 
 function renderStats(data) {
-  const bar = $('#stats-bar');
-  const n = data.num_layers;
-  const active = data.history && data.history.length ? data.history[data.history.length - 1].active_layers : 0;
-  const mean = data.history && data.history.length ? (data.history[data.history.length - 1].mean_norm * 100).toFixed(1) : '0';
+  var bar = $('#stats-bar');
+  var n = data.num_layers;
+  var total = data.total_hooks || n;
+  var active = data.history && data.history.length ? data.history[data.history.length - 1].active_layers : 0;
+  var mean = data.history && data.history.length ? (data.history[data.history.length - 1].mean_norm * 100).toFixed(1) : '0';
 
   bar.innerHTML = [
-    `<div class="stat-item"><div class="stat-val v-layers">${n}</div><div class="stat-label">Layers</div></div>`,
-    `<div class="stat-item"><div class="stat-val v-active">${active}</div><div class="stat-label">Active</div></div>`,
-    `<div class="stat-item"><div class="stat-val v-mean">${mean}%</div><div class="stat-label">Mean</div></div>`,
-    `<div class="stat-item"><div class="stat-val v-age">${data.age_s || '—'}s</div><div class="stat-label">Age</div></div>`,
+    '<div class="stat-item"><div class="stat-val v-layers">' + n + '</div><div class="stat-label">Visible</div></div>',
+    '<div class="stat-item"><div class="stat-val v-hooks">' + total + '</div><div class="stat-label">Total Hooks</div></div>',
+    '<div class="stat-item"><div class="stat-val v-active">' + active + '</div><div class="stat-label">Active</div></div>',
+    '<div class="stat-item"><div class="stat-val v-mean">' + mean + '%</div><div class="stat-label">Mean</div></div>',
+    '<div class="stat-item"><div class="stat-val v-age">' + (data.age_s || '\u2014') + 's</div><div class="stat-label">Age</div></div>',
   ].join('');
+}
+
+function renderCogState(cog) {
+  var label = (cog && cog.label) ? cog.label : 'Idle';
+  var el = $('#cog-label');
+  var sub = $('#cog-sub');
+
+  if (label !== prevCogLabel) {
+    el.style.opacity = '0';
+    setTimeout(function() {
+      el.textContent = label;
+      el.className = 'cog-label s-' + label;
+      el.style.opacity = '0.9';
+    }, 250);
+    prevCogLabel = label;
+  }
+
+  if (cog && cog.energy) {
+    var e = cog.energy;
+    sub.textContent = 'attn ' + cog.attention_ratio.toFixed(2) + '  \u2502  early ' + e.early.toFixed(0) + '  mid ' + e.mid.toFixed(0) + '  deep ' + e.deep.toFixed(0);
+  } else {
+    sub.textContent = label === 'Idle' ? 'waiting for inference' : '';
+  }
+}
+
+function renderEnergy(cog) {
+  var el = $('#energy-section');
+  if (!cog || !cog.energy) { el.innerHTML = ''; return; }
+  var e = cog.energy;
+  var maxE = Math.max(e.attention, e.mlp, e.early, e.mid, e.deep, 1);
+
+  function bar(label, val, color) {
+    var pct = Math.min(100, (val / maxE) * 100);
+    return '<div class="energy-item"><div class="energy-label">' + label + '</div><div class="energy-val" style="color:' + color + '">' + val.toFixed(0) + '</div><div class="energy-bar-track"><div class="energy-bar-fill" style="width:' + pct + '%;background:' + color + '"></div></div></div>';
+  }
+
+  el.innerHTML = bar('Attention', e.attention, 'var(--cyan)') +
+    bar('MLP', e.mlp, 'var(--pink)') +
+    bar('Early (0-20)', e.early, 'var(--accent)') +
+    bar('Mid (21-42)', e.mid, 'var(--purple)') +
+    bar('Deep (43-63)', e.deep, 'var(--green)') +
+    bar('Total', e.total, 'var(--dim)');
 }
 
 async function poll() {
   try {
-    const r = await fetch('/api/activations');
+    var r = await fetch('/api/activations?depth=' + currentDepth);
     if (!r.ok) throw new Error('HTTP ' + r.status);
-    const data = await r.json();
+    var data = await r.json();
 
     if (data.status === 'ok' && data.norms && data.norms.length > 0) {
-      renderGrid(data.norms, data.deltas || []);
+      renderGrid(data.norms, data.deltas || [], data.hooks || null);
       renderStats(data);
+      renderCogState(data.cognitive_state);
+      renderEnergy(data.cognitive_state);
       $('#conn-dot').className = 'conn-dot ok';
-      $('#conn-text').textContent = data.num_layers + ' layers connected';
+      $('#conn-text').textContent = data.num_layers + '/' + (data.total_hooks || data.num_layers) + ' hooks connected';
     } else {
-      renderGrid([], []);
+      renderGrid([], [], null);
+      renderCogState(null);
+      renderEnergy(null);
       $('#conn-dot').className = 'conn-dot off';
       $('#conn-text').textContent = 'waiting for model...';
     }
