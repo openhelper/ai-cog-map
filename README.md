@@ -162,18 +162,25 @@ Use this to embed cognitive visualization into your own observability stack.
 
 ## Author
 
-**Sonny Vleisides** — CTO at ARRA Networks | VP Development at Alice Research
+### Sonny Vleisides
+
+**CTO at ARRA Networks | VP Development at Alice Research**
 
 Serial entrepreneur and technical leader with deep expertise in foundational semiconductor development, private AI tech stacks, and decentralized networking infrastructure.
 
+#### Professional Expertise
 - Pioneering private AI tech stacks and decentralized network infrastructure at Alice Research and ARRA Networks, building secure, scalable, privacy-preserving platforms for next-generation applications.
 - Spearheading decentralized telecommunications platforms as CTO at ARRA Networks, delivering reliable connectivity to underserved communities worldwide.
 - Strong history in semiconductor design, development, and manufacture in prior initiatives.
 - Architecting secure IoT infrastructure, encryption hardware, and decentralized systems across both organizations.
 
-Currently advancing private AI tech stacks and decentralized network infrastructure at ARRA Networks and Alice Research to create robust, privacy-preserving, and energy-efficient connectivity solutions that bridge the digital divide through advanced mesh networking and secure IoT systems.
+#### Current Focus
+Advancing private AI tech stacks and decentralized network infrastructure at ARRA Networks and Alice Research to create robust, privacy-preserving, and energy-efficient connectivity solutions that bridge the digital divide through advanced mesh networking and secure IoT systems.
 
 [LinkedIn](https://www.linkedin.com/in/sonny-vleisides) | [ARRA Networks](https://arranetworks.com) | [GitHub](https://github.com/openhelper)
+
+---
+*Sonny Vleisides – Private AI Tech Stacks | Decentralized Network Infrastructure | Rural Telecommunications | IoT Infrastructure*
 
 ## License
 
