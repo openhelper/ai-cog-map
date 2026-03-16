@@ -44,7 +44,7 @@ pip install aicogmap
 Or from source:
 
 ```bash
-git clone https://github.com/openhelper/ai-cog-map.git
+git clone https://github.com/sonnyvleisides/ai-cog-map.git
 cd ai-cog-map
 pip install -e .
 ```
@@ -242,7 +242,7 @@ The L2 norm captures overall activation magnitude without being sensitive to ind
 
 - [LinkedIn](https://www.linkedin.com/in/sonny-vleisides)
 - [ARRA Networks](https://arranetworks.com)
-- [GitHub](https://github.com/openhelper)
+- [GitHub](https://github.com/sonnyvleisides)
 
 ## License
 

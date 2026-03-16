@@ -30,9 +30,9 @@ dependencies = [
 hook = ["torch"]
 
 [project.urls]
-Homepage = "https://github.com/openhelper/ai-cog-map"
-Repository = "https://github.com/openhelper/ai-cog-map"
-Changelog = "https://github.com/openhelper/ai-cog-map/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/sonnyvleisides/ai-cog-map"
+Repository = "https://github.com/sonnyvleisides/ai-cog-map"
+Changelog = "https://github.com/sonnyvleisides/ai-cog-map/blob/main/CHANGELOG.md"
 
 [project.scripts]
 aicogmap = "aicogmap.server:main"
