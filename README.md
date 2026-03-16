@@ -158,6 +158,14 @@ AI Cog Map exposes a JSON API at `/api/activations` that any dashboard or monito
 
 Use this to embed cognitive visualization into your own observability stack.
 
+## Author
+
+**Sonny Vleisides** — CTO at ARRA Networks | VP Development at Alice Research
+
+- [LinkedIn](https://www.linkedin.com/in/sonny-vleisides)
+- [ARRA Networks](https://arranetworks.com)
+- [GitHub](https://github.com/openhelper)
+
 ## License
 
 MIT
