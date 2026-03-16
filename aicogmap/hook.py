@@ -36,7 +36,7 @@ DEFAULT_SHM_PATH = "/dev/shm/aicogmap-activations"
 HEADER_SIZE = 64  # bytes: magic(4) + version(4) + num_layers(4) + timestamp_ns(8) + flags(4) + reserved(40)
 MAGIC = b"ACGM"
 VERSION = 1
-MAX_LAYERS = 256
+MAX_LAYERS = 1024
 
 
 class ActivationWriter:
