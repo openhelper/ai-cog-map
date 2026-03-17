@@ -1,20 +1,20 @@
 # AI Cog Map
 
-**Real-time transformer layer activation visualization for SGLang inference servers.**
+Real-time transformer layer activation visualization for SGLang.
 
-Watch your AI model think. AI Cog Map captures per-layer activation patterns during inference and renders them as a live heatmap — showing which layers, attention heads, and MLP blocks are doing meaningful work on each forward pass.
+AI Cog Map hooks into SGLang's forward pass and captures per-layer activation norms, then renders them as a live heatmap. You can see which layers, attention heads, and MLP blocks are actually doing work on each token.
 
 ## Features
 
-- **Layer Activation Heatmap** — Grid where each cell represents a hook point in the transformer. Brightness shows activation intensity, from dark through purple to bright cyan.
-- **Component-Aware Visualization** — Hook points are classified by type (attention, MLP, projections, norms) with distinct color tinting so you can see the model's internal structure.
-- **Cognitive Depth Slider** — Control how much detail you see. Slide from "Layer Outputs" (64 cells for a 64-layer model) through to "Full Detail" (every sub-module, 800+ cells).
-- **Auto-Interpreter** — Computes a cognitive state label from activation patterns: Attending, Reasoning, Structuring, Recalling, Searching, Generating, or Processing. Shows what kind of work the model is doing right now.
-- **Activation Delta Bar** — Shows which layers are *changing* between forward passes, revealing where the model's attention is shifting as it processes new tokens.
-- **Live Statistics** — Active layer count, mean activation, data freshness, energy breakdown by component type and layer depth.
-- **Info Tooltip** — Built-in reference explaining what each component type does and what high activation means.
+- Live heatmap grid where each cell is a hook point in the transformer. Colors go from dark (idle) through purple to bright cyan as activation intensity increases.
+- Hook points are classified by component type — attention, MLP, projections, norms — with color tinting so you can visually distinguish the model's internal structure.
+- **Cognitive depth slider** lets you control granularity. At level 1 you see 64 cells (one per layer). Crank it to 5 and you get every sub-module, 800+ cells.
+- Auto-interpreter that computes a cognitive state from the activation patterns: Attending, Reasoning, Structuring, Recalling, Searching, Generating, Processing. It's a rough heuristic based on energy ratios between attention and MLP blocks, and where in the layer stack the activity is concentrated.
+- Delta bar showing which layers changed since the last poll — useful for seeing where the model shifts attention as it works through a sequence.
+- Stats: active layer count, mean activation, data age, energy breakdown by component type and layer depth.
+- Built-in info tooltip explaining what each component type does.
 
-Different types of work create different visual signatures. Code generation activates different layers than creative writing. Math reasoning lights up different patterns than summarization.
+Different tasks look different. Code generation has a distinct activation signature compared to creative writing. Math reasoning lights up different layers than summarization. Once you've watched it for a while you start to recognize the patterns.
 
 ## Architecture
 
@@ -29,11 +29,11 @@ Different types of work create different visual signatures. Code generation acti
 └─────────────────────┘                       └─────────────────────┘
 ```
 
-**Hook Plugin** (`aicogmap.hook`): SGLang forward hook factory. Attaches to every matched sub-module via SGLang's native `--forward-hooks` system. Computes the L2 norm of each module's output tensor and writes to a shared memory buffer. Also classifies each hook point by layer index, component type, and category, writing a metadata sidecar JSON. No SGLang source modification required.
+The **hook plugin** (`aicogmap.hook`) is a SGLang forward hook factory that attaches to every matched sub-module via `--forward-hooks`. It computes `output.detach().float().norm().item()` on each forward pass and writes to shared memory. It also classifies each hook point (layer index, component type, category) and writes a metadata sidecar JSON. No SGLang source modification needed.
 
-**Visualization Server** (`aicogmap.server`): Standalone FastAPI server that reads the shared memory buffer and metadata, computes cognitive state, and serves a real-time heatmap UI. Polls at 500ms for smooth animation.
+The **visualization server** (`aicogmap.server`) is a standalone FastAPI app that reads the shared memory buffer and metadata, computes cognitive state, and serves the heatmap UI at 500ms poll intervals.
 
-**Shared Memory Bridge**: Lock-free binary format (4-byte magic `ACGM` + header + float32 array) at `/dev/shm/aicogmap-activations`. Metadata sidecar at `/dev/shm/aicogmap-metadata.json`. Zero disk I/O, zero serialization overhead. The hook writes, the server reads.
+Communication between the two is through `/dev/shm` — a lock-free binary format (4-byte magic `ACGM` + header + float32 array) plus a JSON sidecar for metadata. Everything stays in RAM, no disk I/O involved.
 
 ## Installation
 
@@ -209,40 +209,25 @@ Returns connection status, hook count, and metadata availability.
 
 ## Performance
 
-- **Hook overhead**: ~0.1-0.5% of inference time (one `tensor.norm()` per hook per forward pass)
-- **Memory**: ~4KB shared memory for 1024 hook points
-- **Metadata**: One-time JSON write per new hook (~4KB for 865 hooks)
-- **Zero overhead when disabled**: Hooks are opt-in via `--forward-hooks`
-- **No disk I/O**: Shared memory (`/dev/shm`) is RAM-backed
+Hook overhead is roughly 0.1-0.5% of inference time — one `tensor.norm()` per hook per forward pass. Shared memory footprint is about 4KB for 1024 hook points, plus another ~4KB one-time write for the metadata JSON. When hooks aren't enabled via `--forward-hooks`, overhead is zero. Everything goes through `/dev/shm` so there's no disk I/O.
 
 ## How It Works
 
-On each forward pass through the model:
+SGLang's hook manager calls the hook function after each matched sub-module executes. The first time a module is seen, the hook resolves its fully qualified name (e.g. `model.layers.12.mlp.gate_up_proj`), classifies the component type, and appends to the metadata sidecar.
 
-1. SGLang's hook manager calls the hook function after each matched sub-module executes
-2. On first encounter, the hook resolves the module's fully qualified name, classifies its component type, and writes the metadata sidecar
-3. The hook computes `output.detach().float().norm().item()` — a single scalar capturing the module's activation magnitude
-4. The scalar is written to a thread-safe buffer, indexed by hook position
-5. A background thread flushes the buffer to shared memory at configurable intervals
-6. The visualization server reads shared memory and metadata, normalizes values, computes cognitive state, and serves the UI
-7. The frontend renders normalized values as a color-mapped heatmap grid with component tinting
+On every forward pass after that, it just computes `output.detach().float().norm().item()` and writes the scalar to a thread-safe buffer. A background flusher thread pushes the buffer to shared memory at configurable intervals (default 100ms).
 
-The L2 norm captures overall activation magnitude without being sensitive to individual outlier values, and is extremely cheap to compute on GPU tensors.
+The visualization server reads that shared memory, normalizes the values relative to the current max, runs the cognitive state heuristic, and serves it all to the frontend. The frontend maps normalized values to a color ramp and renders the grid.
+
+L2 norm was chosen because it captures overall activation magnitude without being thrown off by individual outlier values, and it's cheap to compute on GPU tensors.
 
 ## Compatibility
 
-- **SGLang**: Any version with `--forward-hooks` support (PR #13217)
-- **Models**: Any transformer-based model served by SGLang
-- **GPU**: Any NVIDIA GPU supported by SGLang
-- **OS**: Linux (requires `/dev/shm` for shared memory)
+Requires SGLang with `--forward-hooks` support (PR #13217), any transformer model SGLang can serve, any NVIDIA GPU, and Linux (needs `/dev/shm`).
 
 ## Author
 
-**Sonny Vleisides** — CTO at ARRA Networks | VP Development at Alice Research
-
-- [LinkedIn](https://www.linkedin.com/in/sonny-vleisides)
-- [ARRA Networks](https://arranetworks.com)
-- [GitHub](https://github.com/sonnyvleisides)
+Sonny Vleisides — [LinkedIn](https://www.linkedin.com/in/sonny-vleisides) · [ARRA Networks](https://arranetworks.com) · [GitHub](https://github.com/sonnyvleisides)
 
 ## License
 
